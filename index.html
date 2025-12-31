@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wishes Image Maker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:#eaeaea;
+  display:flex;
+  justify-content:center;
+}
+#app{
+  background:#fff;
+  max-width:420px;
+  width:100%;
+  padding:10px;
+}
+canvas{
+  width:100%;
+  border-radius:12px;
+  background:#ccc;
+  touch-action:none;
+}
+.controls{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:6px;
+  margin-top:8px;
+}
+button,select,input[type=color],input[type=file]{
+  padding:8px;
+  border:none;
+  border-radius:6px;
+  background:#0066ff;
+  color:#fff;
+}
+button.secondary{background:#444}
+input[type=text]{
+  grid-column:1/3;
+  padding:7px;
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+<canvas id="canvas" width="1080" height="1080"></canvas>
+
+<div class="controls">
+  <button onclick="prev()">⬅ Prev</button>
+  <button onclick="next()">Next ➡</button>
+
+  <input type="file" accept="image/*" onchange="loadUserImage(event)">
+  <button onclick="cropImage()">✂ Crop</button>
+
+  <input type="text" id="textInput">
+
+  <select id="fontSelect">
+    <option>Arial</option>
+    <option>Georgia</option>
+    <option>Courier New</option>
+    <option>Comic Sans MS</option>
+  </select>
+
+  <input type="color" id="colorPicker">
+
+  <button class="secondary" onclick="toggleShadow()">Shadow</button>
+  <button class="secondary" onclick="toggleOutline()">Outline</button>
+
+  <button onclick="download()">⬇ Download</button>
+</div>
+
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+/* -------- TEMPLATES (FREE LOCAL IMAGES) -------- */
+const templates = [
+  {
+    category:"Good Morning",
+    text:"Good Morning ☀️",
+    bg:"backgrounds/morning1.jpg",
+    textColor:"#ffffff"
+  },
+  {
+    category:"Good Night",
+    text:"Good Night 🌙",
+    bg:"backgrounds/night1.jpg",
+    textColor:"#ffffff"
+  },
+  {
+    category:"Motivation",
+    text:"Believe in Yourself 💪",
+    bg:"backgrounds/motivation1.jpg",
+    textColor:"#ffffff"
+  },
+  {
+    category:"Birthday",
+    text:"Happy Birthday 🎉",
+    bg:"backgrounds/birthday1.jpg",
+    textColor:"#ffffff"
+  }
+];
+
+let index = 0;
+let bgImg = new Image();
+
+let userImg = null;
+let img = {x:390,y:420,w:300,h:300,scale:1};
+
+let dragging = false;
+let startX,startY;
+
+/* -------- TEXT SETTINGS -------- */
+let text = {
+  value: templates[0].text,
+  color: templates[0].textColor,
+  font: "Arial",
+  shadow: false,
+  outline: false
+};
+
+textInput.value = text.value;
+colorPicker.value = text.color;
+
+/* -------- LOAD BACKGROUND -------- */
+function loadBackground(){
+  bgImg.src = templates[index].bg;
+  bgImg.onload = draw;
+}
+
+/* -------- DRAW -------- */
+function draw(){
+  if(bgImg.complete){
+    ctx.drawImage(bgImg,0,0,1080,1080);
+  }else{
+    ctx.fillStyle="#999";
+    ctx.fillRect(0,0,1080,1080);
+  }
+
+  // text
+  ctx.font = `bold 80px ${text.font}`;
+  ctx.textAlign = "center";
+  ctx.fillStyle = text.color;
+
+  if(text.shadow){
+    ctx.shadowColor="rgba(0,0,0,0.6)";
+    ctx.shadowBlur=12;
+  }
+
+  if(text.outline){
+    ctx.lineWidth=6;
+    ctx.strokeStyle="#000";
+    ctx.strokeText(text.value,540,140);
+  }
+
+  ctx.fillText(text.value,540,140);
+  ctx.shadowBlur = 0;
+
+  // user image
+  if(userImg){
+    ctx.drawImage(
+      userImg,
+      img.x,img.y,
+      img.w*img.scale,
+      img.h*img.scale
+    );
+  }
+}
+
+/* -------- TEMPLATE NAV -------- */
+function next(){
+  index = (index+1) % templates.length;
+  applyTemplate();
+}
+function prev(){
+  index = (index-1+templates.length) % templates.length;
+  applyTemplate();
+}
+function applyTemplate(){
+  text.value = templates[index].text;
+  text.color = templates[index].textColor;
+  textInput.value = text.value;
+  colorPicker.value = text.color;
+  loadBackground();
+}
+
+/* -------- USER IMAGE -------- */
+function loadUserImage(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const im = new Image();
+  im.onload = ()=>{
+    userImg = im;
+    img = {x:390,y:420,w:300,h:300,scale:1};
+    draw();
+  }
+  im.src = URL.createObjectURL(file);
+}
+
+/* -------- SIMPLE CENTER CROP -------- */
+function cropImage(){
+  if(!userImg) return;
+  const size = Math.min(userImg.width,userImg.height);
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const cctx = c.getContext("2d");
+  cctx.drawImage(
+    userImg,
+    (userImg.width-size)/2,
+    (userImg.height-size)/2,
+    size,size,
+    0,0,size,size
+  );
+  userImg = new Image();
+  userImg.onload = draw;
+  userImg.src = c.toDataURL();
+}
+
+/* -------- TEXT CONTROLS -------- */
+textInput.oninput = e => { text.value = e.target.value; draw(); }
+fontSelect.onchange = e => { text.font = e.target.value; draw(); }
+colorPicker.oninput = e => { text.color = e.target.value; draw(); }
+function toggleShadow(){ text.shadow = !text.shadow; draw(); }
+function toggleOutline(){ text.outline = !text.outline; draw(); }
+
+/* -------- DRAG & ZOOM -------- */
+canvas.addEventListener("pointerdown",e=>{
+  dragging=true;
+  startX=e.clientX;
+  startY=e.clientY;
+});
+canvas.addEventListener("pointermove",e=>{
+  if(!dragging) return;
+  img.x += e.clientX-startX;
+  img.y += e.clientY-startY;
+  startX=e.clientX;
+  startY=e.clientY;
+  draw();
+});
+canvas.addEventListener("pointerup",()=>dragging=false);
+canvas.addEventListener("wheel",e=>{
+  img.scale += e.deltaY*-0.001;
+  img.scale = Math.max(0.2,Math.min(3,img.scale));
+  draw();
+});
+
+/* -------- DOWNLOAD -------- */
+function download(){
+  const a = document.createElement("a");
+  a.download = "wishes-1080.png";
+  a.href = canvas.toDataURL("image/png");
+  a.click();
+}
+
+/* -------- INIT -------- */
+loadBackground();
+</script>
+
+</body>
+</html>
+
